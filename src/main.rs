@@ -25,6 +25,11 @@ enum Command {
     },
 }
 
+#[derive(Debug)]
+enum Kind {
+    Blob,
+}
+
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     match args.command {
@@ -39,6 +44,11 @@ fn main() -> anyhow::Result<()> {
             pretty_print,
             object_hash,
         } => {
+            anyhow::ensure!(
+                pretty_print,
+                "-p must be provided until 'mode' is supported"
+            );
+
             let file = std::fs::File::open(format!(
                 ".git/objects/{}/{}",
                 &object_hash[..2],
@@ -57,34 +67,27 @@ fn main() -> anyhow::Result<()> {
                 .to_str()
                 .context(".git/objects file header is not valid UTF-8")?;
 
-            let Some(size) = header.strip_prefix("blob ") else {
-                anyhow::bail!(
-                    ".git/ojbects file header did not start with 'blob ', found {}",
-                    header
-                );
+            let Some((kind, size)) = header.split_once(' ') else {
+                anyhow::bail!("unexpected .git/objects file header");
             };
 
+            let kind = match kind {
+                "blob" => Kind::Blob,
+                _ => anyhow::bail!("unimplemented file type"),
+            };
             let size = size
-                .parse::<usize>()
+                .parse::<u64>()
                 .context("invalid size in .git/objects file header {size}")?;
-            buf.clear();
-            buf.resize(size, 0);
-            d.read_exact(&mut buf)
-                .context(".git/objects file reached EOF unexpectedly")?;
-            let trailing = d
-                .read(&mut [0])
-                .context("read EOF from .git/objects file")?;
-            anyhow::ensure!(
-                trailing == 0,
-                ".git/objects file contained {} trailing bytes",
-                trailing
-            );
 
-            let stdout = std::io::stdout();
-            let mut stdout = stdout.lock();
-            stdout
-                .write_all(&buf[..])
-                .context("failed to write .git/objects file into stdout")?;
+            let mut d = d.take(size);
+            match kind {
+                Kind::Blob => {
+                    let stdout = std::io::stdout();
+                    let mut stdout = stdout.lock();
+                    std::io::copy(&mut d, &mut stdout)
+                        .context("failed to write .git/objects content to stdout")?;
+                }
+            }
         }
     }
 
