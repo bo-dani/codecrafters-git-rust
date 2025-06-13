@@ -30,7 +30,7 @@ enum Command {
         #[clap(long)]
         name_only: bool,
 
-        tree_ish: String,
+        tree_hash: String,
     },
 }
 
@@ -51,9 +51,9 @@ fn main() -> anyhow::Result<()> {
         }
         Command::LsTree {
             name_only,
-            tree_ish,
+            tree_hash,
         } => {
-            commands::ls_tree::invoke(name_only, tree_ish)?;
+            commands::ls_tree::invoke(name_only, tree_hash)?;
         }
     }
 
