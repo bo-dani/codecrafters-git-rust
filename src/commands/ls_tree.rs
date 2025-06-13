@@ -36,9 +36,10 @@ pub(crate) fn invoke(name_only: bool, tree_hash: String) -> anyhow::Result<()> {
                 .context("failed to write name to stdout")?;
         } else {
             let mode = std::str::from_utf8(mode).context("mode is always valid utf-8")?;
-            // TODO print out the object type as well
-            let kind = "tree";
             let hash = hex::encode(hash_buf);
+            let kind = Object::read(&hash)
+                .context("cannot read object in tree object")?
+                .kind;
             write!(stdout, "{mode:0>6} {kind} {hash}    ")
                 .context("failed to write tree metadata to stdout")?;
             stdout
